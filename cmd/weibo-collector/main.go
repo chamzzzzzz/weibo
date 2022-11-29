@@ -1,0 +1,183 @@
+package main
+
+import (
+	"github.com/chamzzzzzz/weibo"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/robfig/cron/v3"
+	"github.com/urfave/cli/v2"
+	"log"
+	"os"
+	"strings"
+	"time"
+)
+
+var (
+	logger = log.New(os.Stdout, "weibo: ", log.Ldate|log.Lmicroseconds)
+)
+
+type App struct {
+	cli      *cli.App
+	client   *weibo.Client
+	database *weibo.Database
+	full     bool
+	tz       string
+	spec     string
+	userid   string
+	page     int
+	sleep    int
+}
+
+func (app *App) Run() error {
+	app.client = &weibo.Client{}
+	app.database = &weibo.Database{}
+	app.cli = &cli.App{
+		Usage: "weibo collector and monitor",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "cookie",
+				Value:       "",
+				Usage:       "client cookie",
+				Destination: &app.client.Cookie,
+			},
+			&cli.StringFlag{
+				Name:        "userid",
+				Value:       weibo.Huxijing,
+				Usage:       "userid list",
+				Destination: &app.userid,
+			},
+			&cli.IntFlag{
+				Name:        "page",
+				Value:       1,
+				Usage:       "start page",
+				Destination: &app.page,
+			},
+			&cli.IntFlag{
+				Name:        "sleep",
+				Value:       10,
+				Usage:       "sleep seconds between page",
+				Destination: &app.sleep,
+			},
+			&cli.StringFlag{
+				Name:        "dn",
+				Value:       "mysql",
+				Usage:       "database driver name",
+				Destination: &app.database.DN,
+			},
+			&cli.StringFlag{
+				Name:        "dsn",
+				Value:       "root:root@/weibo",
+				Usage:       "database source name",
+				Destination: &app.database.DSN,
+			},
+			&cli.BoolFlag{
+				Name:        "full",
+				Value:       false,
+				Usage:       "full collect",
+				Destination: &app.full,
+			},
+			&cli.StringFlag{
+				Name:        "spec",
+				Value:       "30 * * * *",
+				Usage:       "cron spec",
+				Destination: &app.spec,
+			},
+			&cli.StringFlag{
+				Name:        "tz",
+				Value:       "Local",
+				Usage:       "time zone",
+				Destination: &app.tz,
+			},
+		},
+		Action: app.run,
+	}
+	return app.cli.Run(os.Args)
+}
+
+func (app *App) run(c *cli.Context) error {
+	if err := app.database.Migrate(); err != nil {
+		return err
+	}
+	if app.full {
+		logger.Printf("full collecting.")
+		if _, err := app.collect(true); err != nil {
+			return err
+		}
+		logger.Printf("full collecting finished.")
+	}
+	return app.cron()
+}
+
+func (app *App) cron() error {
+	logger.Printf("monitoring.")
+	c := cron.New(
+		cron.WithLocation(location(app.tz)),
+		cron.WithLogger(cron.VerbosePrintfLogger(logger)),
+		cron.WithChain(cron.SkipIfStillRunning(cron.VerbosePrintfLogger(logger))),
+	)
+	c.AddFunc(app.spec, app.monitoring)
+	c.Run()
+	return nil
+}
+
+func (app *App) collect(full bool) ([]*weibo.Mblog, error) {
+	page := 1
+	if full {
+		page = 98
+	}
+
+	var mblogs []*weibo.Mblog
+	for _, userid := range strings.Split(app.userid, ",") {
+		for i := app.page; i <= page; i++ {
+			logger.Printf("collecting. userid=%s, page=%d", userid, i)
+			_mblogs, err := app.client.GetMblogs(userid, i, true)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, mblog := range _mblogs {
+				if has, err := app.database.HasMblog(mblog); err != nil {
+					return nil, err
+				} else if has {
+					continue
+				}
+
+				if err := app.database.AddMblog(mblog); err != nil {
+					return nil, err
+				}
+				mblogs = append(mblogs, mblog)
+			}
+			logger.Printf("sleep %d seconds", app.sleep)
+			time.Sleep(time.Duration(app.sleep) * time.Second)
+		}
+	}
+	return mblogs, nil
+}
+
+func (app *App) monitoring() {
+	if mblogs, err := app.collect(false); err != nil {
+		logger.Printf("monitoring, err='%s'\n", err)
+	} else {
+		if len(mblogs) > 0 {
+			logger.Printf("monitoring found new weibo mblog.")
+			app.notification(mblogs)
+		}
+	}
+}
+
+func (app *App) notification(mblogs []*weibo.Mblog) {
+	logger.Printf("send notification.")
+}
+
+func location(tz string) *time.Location {
+	if loc, err := time.LoadLocation(tz); err != nil {
+		return time.Local
+	} else {
+		return loc
+	}
+}
+
+func main() {
+	if err := (&App{}).Run(); err != nil {
+		logger.Printf("run, err='%s'\n", err)
+	}
+}
