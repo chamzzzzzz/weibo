@@ -13,6 +13,7 @@ import (
 
 const (
 	Huxijing = "1989660417"
+	Cookie   = "WBPSESS=durPiJxsbzq5XDaI2wW0NxQldYOrBwQzLVlPfvpcy3mQ3XQonV49sfubFlqvuI_rBrarQ2dZHLfrOVaRKnvrm9130Jsv26CGHwu2LjHl3RrnHDHKIUtZPYEi9qKk6n-K; SUB=_2AkMU1LJTf8NxqwJRmPAQymrhaYl_yg_EieKiiEOIJRMxHRl-yT92qkI6tRB6P1ScvMDt8JtdZqvVJlNftBcRg-WjvODv; SUBP=0033WrSXqPxfM72-Ws9jqgMF55529P9D9WFSWJI0b_93sKJGpCc_.aOL; XSRF-TOKEN=Z3qrKi3V9M0TVao6eTMMmpRC"
 )
 
 var BadRequest = errors.New("BadRequest")

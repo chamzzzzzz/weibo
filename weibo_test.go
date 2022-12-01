@@ -10,6 +10,9 @@ func TestCrawl(t *testing.T) {
 		Cookie: os.Getenv("WEIBO_CLIENT_TEST_COOKIE"),
 		Proxy:  os.Getenv("WEIBO_CLIENT_TEST_PROXY"),
 	}
+	if c.Cookie == "" {
+		c.Cookie = Cookie
+	}
 	if mblogs, err := c.GetMblogs(Huxijing, 1, true); err != nil {
 		t.Error(err)
 	} else {
