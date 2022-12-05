@@ -35,7 +35,7 @@ func (app *App) Run() error {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "cookie",
-				Value:       "",
+				Value:       weibo.Cookie,
 				Usage:       "client cookie",
 				Destination: &app.client.Cookie,
 				EnvVars:     []string{"WEIBO_COLLECTOR_COOKIE"},
