@@ -60,14 +60,14 @@ func main() {
 				log.Printf("Failed to stat user [%s] directory [%s]. error:'%v'", userid, dir, err)
 				continue
 			}
-			pageCount = 5
+			pageCount = 2
 		}
 		if fi != nil && !fi.IsDir() {
 			log.Printf("User [%s] directory [%s] is not a directory.", userid, dir)
 			continue
 		}
 
-		mblogs, err := get(client, userid, pageCount, 10*time.Second)
+		mblogs, err := get(client, userid, pageCount)
 		if err != nil {
 			log.Printf("Failed to get mblogs for user [%s]. error:'%v'", userid, err)
 			continue
@@ -148,13 +148,9 @@ func loadConfig() (*Config, error) {
 	return config, nil
 }
 
-func get(client *weibo.Client, userid string, pageCount int, pageSleep time.Duration) ([]*weibo.Mblog, error) {
+func get(client *weibo.Client, userid string, pageCount int) ([]*weibo.Mblog, error) {
 	var mblogs []*weibo.Mblog
 	for page := 1; page <= pageCount; page++ {
-		if page > 1 {
-			log.Printf("Sleeping for [%v] before fetching page [%d].", pageSleep, page)
-			time.Sleep(pageSleep)
-		}
 		_mblogs, err := client.GetMblogs(userid, page, true)
 		if err != nil {
 			log.Printf("Failed to get mblogs for user [%s] page [%d]. error:'%v'", userid, page, err)
