@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -16,7 +16,7 @@ const (
 	Cookie   = "WBPSESS=durPiJxsbzq5XDaI2wW0NxQldYOrBwQzLVlPfvpcy3mQ3XQonV49sfubFlqvuI_rBrarQ2dZHLfrOVaRKnvrm9130Jsv26CGHwu2LjHl3RrnHDHKIUtZPYEi9qKk6n-K; SUB=_2AkMU1LJTf8NxqwJRmPAQymrhaYl_yg_EieKiiEOIJRMxHRl-yT92qkI6tRB6P1ScvMDt8JtdZqvVJlNftBcRg-WjvODv; SUBP=0033WrSXqPxfM72-Ws9jqgMF55529P9D9WFSWJI0b_93sKJGpCc_.aOL; XSRF-TOKEN=Z3qrKi3V9M0TVao6eTMMmpRC"
 )
 
-var BadRequest = errors.New("BadRequest")
+var ErrBadRequest = errors.New("BadRequest")
 
 type User struct {
 	ID   int64  `json:"id"`
@@ -95,10 +95,10 @@ func (c *Client) getJSON(_url string, body any) error {
 	defer res.Body.Close()
 
 	if res.StatusCode == http.StatusBadRequest {
-		return BadRequest
+		return ErrBadRequest
 	}
 
-	data, err := ioutil.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func (c *Client) GetMblogLongText(mblogid string) (longtext string, err error) {
 func (c *Client) FetchMblogLongText(mblog *Mblog) error {
 	if mblog.IsLongText {
 		if longtext, err := c.GetMblogLongText(mblog.MblogID); err != nil {
-			if err == BadRequest {
+			if err == ErrBadRequest {
 				return nil
 			}
 			return err
