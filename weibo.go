@@ -69,7 +69,7 @@ type Client struct {
 	Proxy  string
 }
 
-func (c *Client) getJSON(_url string, body any) error {
+func (c *Client) getJSON(_url string, userid string, body any) error {
 	client := &http.Client{}
 	if c.Proxy != "" {
 		if proxyUrl, err := url.Parse(c.Proxy); err == nil {
@@ -87,6 +87,7 @@ func (c *Client) getJSON(_url string, body any) error {
 	req.Header.Set("Host", "weibo.com")
 	req.Header.Set("Cookie", c.Cookie)
 	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Referer", fmt.Sprintf("https://weibo.com/u/%s", userid))
 
 	res, err := client.Do(req)
 	if err != nil {
@@ -112,7 +113,7 @@ func (c *Client) getJSON(_url string, body any) error {
 func (c *Client) GetMblogs(userid string, page int, longtext bool) ([]*Mblog, error) {
 	url := fmt.Sprintf("https://weibo.com/ajax/statuses/mymblog?uid=%s&page=%d&feature=0", userid, page)
 	body := &MymblogBody{}
-	if err := c.getJSON(url, body); err != nil {
+	if err := c.getJSON(url, userid, body); err != nil {
 		return nil, err
 	} else if body.Ok != 1 {
 		return nil, fmt.Errorf("body not ok")
@@ -120,11 +121,11 @@ func (c *Client) GetMblogs(userid string, page int, longtext bool) ([]*Mblog, er
 	var mblogs []*Mblog
 	for _, v := range body.Data.List {
 		if longtext {
-			if err := c.FetchMblogLongText(v); err != nil {
+			if err := c.FetchMblogLongText(userid, v); err != nil {
 				return nil, err
 			}
 			if v.Retweeted != nil {
-				if err := c.FetchMblogLongText(v.Retweeted); err != nil {
+				if err := c.FetchMblogLongText(userid, v.Retweeted); err != nil {
 					return nil, err
 				}
 			}
@@ -134,10 +135,10 @@ func (c *Client) GetMblogs(userid string, page int, longtext bool) ([]*Mblog, er
 	return mblogs, nil
 }
 
-func (c *Client) GetMblogLongText(mblogid string) (longtext string, err error) {
+func (c *Client) GetMblogLongText(userid, mblogid string) (longtext string, err error) {
 	url := fmt.Sprintf("https://weibo.com/ajax/statuses/longtext?id=%s", mblogid)
 	body := &LongtextBody{}
-	if err = c.getJSON(url, body); err != nil {
+	if err = c.getJSON(url, userid, body); err != nil {
 		return
 	}
 	if body.Ok != 1 {
@@ -148,9 +149,9 @@ func (c *Client) GetMblogLongText(mblogid string) (longtext string, err error) {
 	return
 }
 
-func (c *Client) FetchMblogLongText(mblog *Mblog) error {
+func (c *Client) FetchMblogLongText(userid string, mblog *Mblog) error {
 	if mblog.IsLongText {
-		if longtext, err := c.GetMblogLongText(mblog.MblogID); err != nil {
+		if longtext, err := c.GetMblogLongText(userid, mblog.MblogID); err != nil {
 			if err == ErrBadRequest {
 				return nil
 			}
